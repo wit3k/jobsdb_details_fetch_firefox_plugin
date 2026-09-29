@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JobsDB Extractor</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="header">
+      <div>
+        <h1>JobsDB Extractor</h1>
+        <p id="status" class="status">Checking page…</p>
+      </div>
+      <button id="btn-refresh" class="btn btn-ghost" type="button" title="Refresh">↻</button>
+    </header>
+
+    <section id="summary" class="summary" hidden></section>
+
+    <section class="actions">
+      <button id="btn-json" class="btn btn-primary" type="button" disabled>Copy JSON</button>
+      <button id="btn-md" class="btn" type="button" disabled>Copy Markdown</button>
+      <button id="btn-text" class="btn" type="button" disabled>Copy text</button>
+    </section>
+
+    <section class="bulk">
+      <div class="bulk-head">
+        <h2>All open JobsDB job tabs</h2>
+        <p id="bulk-status" class="bulk-status">Scans every open JobsDB job tab</p>
+      </div>
+      <div class="actions bulk-actions">
+        <button id="btn-bulk-json" class="btn btn-primary" type="button">Export JSON</button>
+        <button id="btn-bulk-md" class="btn" type="button">Export MD</button>
+        <button id="btn-bulk-text" class="btn" type="button">Export TXT</button>
+      </div>
+    </section>
+
+    <footer class="footer">
+      Works on job detail pages at <code>hk.jobsdb.com</code> / <code>th.jobsdb.com</code>
+    </footer>
+
+    <script src="../content/extract.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

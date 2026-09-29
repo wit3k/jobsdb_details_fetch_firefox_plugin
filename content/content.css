@@ -1,0 +1,50 @@
+#jobsdb-extractor-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2147483646;
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font: 600 13px/1.2 "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  color: #0f172a;
+  background: #2dd4bf;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28);
+  cursor: pointer;
+}
+
+#jobsdb-extractor-fab:hover {
+  background: #5eead4;
+}
+
+#jobsdb-extractor-fab:active {
+  transform: translateY(1px);
+}
+
+#jobsdb-extractor-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 88px;
+  z-index: 2147483647;
+  transform: translateX(-50%) translateY(12px);
+  opacity: 0;
+  pointer-events: none;
+  max-width: min(90vw, 360px);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font: 500 13px/1.35 "Segoe UI", system-ui, sans-serif;
+  color: #f8fafc;
+  background: #0f172a;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.35);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+#jobsdb-extractor-toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+#jobsdb-extractor-toast.is-error {
+  background: #9f1239;
+}
