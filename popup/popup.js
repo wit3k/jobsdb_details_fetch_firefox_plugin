@@ -36,7 +36,7 @@ function setBulkBusy(busy) {
 function renderSummary(job) {
   if (!job) {
     summaryEl.hidden = true;
-    summaryEl.innerHTML = "";
+    summaryEl.replaceChildren();
     return;
   }
   const rows = [
@@ -48,23 +48,21 @@ function renderSummary(job) {
     ["Source", job.source],
   ].filter(([, v]) => v);
 
-  summaryEl.innerHTML = rows
-    .map(
-      ([k, v]) =>
-        `<div class="row"><span class="k">${escapeHtml(k)}</span><span class="v">${escapeHtml(
-          String(v)
-        )}</span></div>`
-    )
-    .join("");
+  summaryEl.replaceChildren(
+    ...rows.map(([k, v]) => {
+      const row = document.createElement("div");
+      row.className = "row";
+      const keyEl = document.createElement("span");
+      keyEl.className = "k";
+      keyEl.textContent = k;
+      const valEl = document.createElement("span");
+      valEl.className = "v";
+      valEl.textContent = String(v);
+      row.append(keyEl, valEl);
+      return row;
+    })
+  );
   summaryEl.hidden = false;
-}
-
-function escapeHtml(s) {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
 }
 
 function setJob(job, note) {

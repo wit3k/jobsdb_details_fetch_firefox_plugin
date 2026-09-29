@@ -58,6 +58,14 @@
     return h || null;
   }
 
+  /** Strip tags from HTML without assigning to Element.innerHTML (AMO linter). */
+  function htmlToText(html) {
+    if (!html) return null;
+    const doc = new DOMParser().parseFromString(String(html), "text/html");
+    const t = (doc.body?.textContent || "").replace(/\s+/g, " ").trim();
+    return t || null;
+  }
+
   function firstMatch(selectors) {
     for (const sel of selectors) {
       const el = document.querySelector(sel);
@@ -178,9 +186,7 @@
       node.abstract
     );
     if (!text && html) {
-      const tmp = document.createElement("div");
-      tmp.innerHTML = html;
-      text = textOf(tmp);
+      text = htmlToText(html);
     }
     return { text, html };
   }
@@ -291,9 +297,7 @@
             : null;
         let description = typeof item.description === "string" ? item.description : null;
         if (descriptionHtml) {
-          const tmp = document.createElement("div");
-          tmp.innerHTML = descriptionHtml;
-          description = textOf(tmp);
+          description = htmlToText(descriptionHtml);
         }
 
         return {

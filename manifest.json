@@ -1,12 +1,15 @@
 {
   "manifest_version": 3,
   "name": "JobsDB Extractor",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Extract job offer details from JobsDB (HK/TH).",
   "browser_specific_settings": {
     "gecko": {
       "id": "jobsdb-extractor@local",
-      "strict_min_version": "109.0"
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
     }
   },
   "permissions": ["activeTab", "tabs", "clipboardWrite", "storage"],
