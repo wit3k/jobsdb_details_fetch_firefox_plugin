@@ -1,0 +1,6 @@
+dist/
+*.xpi
+*.zip
+.DS_Store
+*~
+*.swp
