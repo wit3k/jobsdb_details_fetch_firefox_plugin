@@ -2,6 +2,8 @@
 
 A Firefox extension that pulls structured job details from [JobsDB](https://www.jobsdb.com) listing pages (Hong Kong & Thailand) and lets you copy or export them as JSON, Markdown, or plain text.
 
+![JobsDB Extractor popup](screenshot01.png)
+
 ## Features
 
 - **One-click extract** from the current job page (popup or on-page button)
