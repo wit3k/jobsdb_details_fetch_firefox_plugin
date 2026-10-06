@@ -94,6 +94,20 @@ function isJobsDbUrl(url) {
   }
 }
 
+function isLinkedInUrl(url) {
+  try {
+    const host = new URL(url).hostname;
+    return host === "linkedin.com" || host.endsWith(".linkedin.com");
+  } catch {
+    return false;
+  }
+}
+
+function isSupportedSiteUrl(url) {
+  if (isJobsDbUrl(url)) return true;
+  return isLinkedInJobUrl(url);
+}
+
 function isJobsDbJobUrl(url) {
   if (!isJobsDbUrl(url)) return false;
   try {
@@ -104,6 +118,23 @@ function isJobsDbJobUrl(url) {
   }
 }
 
+function isLinkedInJobUrl(url) {
+  if (!isLinkedInUrl(url)) return false;
+  try {
+    return /\/jobs\/view\/(?:.*-)?(\d+)\/?/i.test(new URL(url).pathname || "");
+  } catch {
+    return false;
+  }
+}
+
+function isJobDetailUrl(url) {
+  return isJobsDbJobUrl(url) || isLinkedInJobUrl(url);
+}
+
+function extractorApi() {
+  return globalThis.JobExtractor || globalThis.JobsDBExtractor;
+}
+
 function stamp() {
   const d = new Date();
   const p = (n) => String(n).padStart(2, "0");
@@ -112,28 +143,56 @@ function stamp() {
   )}${p(d.getSeconds())}`;
 }
 
-function downloadText(filename, text, mime) {
+async function downloadText(filename, text, mime) {
   const blob = new Blob([text], { type: `${mime};charset=utf-8` });
   const url = URL.createObjectURL(blob);
+
+  // Prefer the downloads API so the file survives popup close and is not
+  // truncated by an early revokeObjectURL (common with large LinkedIn exports).
+  try {
+    if (browser.downloads?.download) {
+      await browser.downloads.download({
+        url,
+        filename,
+        saveAs: false,
+        conflictAction: "uniquify",
+      });
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      return;
+    }
+  } catch {
+    /* fall back to <a download> */
+  }
+
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+function uniqueJobIdCount(jobs) {
+  const ids = new Set();
+  for (const job of jobs) {
+    if (job?.jobId) ids.add(String(job.jobId));
+    else if (job?.pageUrl) ids.add(job.pageUrl);
+    else if (job?.url) ids.add(job.url);
+  }
+  return ids.size;
 }
 
 function jobToMarkdown(job) {
   return (
-    globalThis.JobsDBExtractor?.toMarkdown?.(job) ||
+    extractorApi()?.toMarkdown?.(job) ||
     `# ${job.title || "Job"}\n\n${job.description || ""}\n`
   );
 }
 
 function jobToPlainText(job) {
   return (
-    globalThis.JobsDBExtractor?.toPlainText?.(job) ||
+    extractorApi()?.toPlainText?.(job) ||
     [job.title, job.company, job.description].filter(Boolean).join("\n") + "\n"
   );
 }
@@ -159,10 +218,32 @@ function jobsToPlainText(jobs) {
     .trim() + "\n";
 }
 
-async function extractFromTabId(tabId) {
+async function extractFromTabId(tabId, pageUrl) {
   try {
-    const result = await browser.tabs.sendMessage(tabId, { type: "EXTRACT_JOB" });
-    if (result?.ok && result.job) return { ok: true, job: result.job };
+    const result = await browser.tabs.sendMessage(tabId, {
+      type: "EXTRACT_JOB",
+      pageUrl: pageUrl || undefined,
+    });
+    if (result?.ok && result.job) {
+      const job = { ...result.job };
+      if (pageUrl) {
+        job.pageUrl = pageUrl;
+        job.url = pageUrl;
+          const fromTab =
+          globalThis.LinkedInExtractor?.extractJobIdFromUrl?.(pageUrl) ||
+          null;
+        // Prefer id derived from the tab URL when available (popup may not load LinkedIn helper).
+        try {
+          const u = new URL(pageUrl);
+          const view = u.pathname.match(/\/jobs\/view\/(?:.*-)?(\d+)\/?/i);
+          if (view?.[1]) job.jobId = view[1];
+          else if (fromTab) job.jobId = fromTab;
+        } catch {
+          if (fromTab) job.jobId = fromTab;
+        }
+      }
+      return { ok: true, job };
+    }
     return { ok: false, error: result?.errors?.[0] || "No job data found" };
   } catch {
     return { ok: false, error: "Content script unavailable — refresh the tab" };
@@ -171,26 +252,26 @@ async function extractFromTabId(tabId) {
 
 async function getOpenJobTabs() {
   const tabs = await browser.tabs.query({});
-  return tabs.filter((tab) => tab.id != null && tab.url && isJobsDbJobUrl(tab.url));
+  return tabs.filter((tab) => tab.id != null && tab.url && isJobDetailUrl(tab.url));
 }
 
 async function extractAllOpenJobs() {
   const jobTabs = await getOpenJobTabs();
   if (!jobTabs.length) {
-    return { jobs: [], failed: 0, tabCount: 0 };
+    return { jobs: [], failed: 0, tabCount: 0, failures: [] };
   }
 
   const jobs = [];
-  let failed = 0;
+  const failures = [];
 
   for (const tab of jobTabs) {
-    setBulkStatus(`Extracting ${jobs.length + failed + 1}/${jobTabs.length}…`);
-    const result = await extractFromTabId(tab.id);
+    setBulkStatus(`Extracting ${jobs.length + failures.length + 1}/${jobTabs.length}…`);
+    const result = await extractFromTabId(tab.id, tab.url);
     if (result.ok) jobs.push(result.job);
-    else failed += 1;
+    else failures.push({ url: tab.url, error: result.error });
   }
 
-  return { jobs, failed, tabCount: jobTabs.length };
+  return { jobs, failed: failures.length, tabCount: jobTabs.length, failures };
 }
 
 async function exportAll(format) {
@@ -199,10 +280,10 @@ async function exportAll(format) {
   setBulkStatus("Scanning open tabs…");
 
   try {
-    const { jobs, failed, tabCount } = await extractAllOpenJobs();
+    const { jobs, failed, tabCount, failures } = await extractAllOpenJobs();
 
     if (!tabCount) {
-      setBulkStatus("No open JobsDB job tabs found", "is-error");
+      setBulkStatus("No open JobsDB / LinkedIn job tabs found", "is-error");
       return;
     }
     if (!jobs.length) {
@@ -213,7 +294,8 @@ async function exportAll(format) {
       return;
     }
 
-    const base = `jobsdb-jobs-${stamp()}`;
+    const uniqueIds = uniqueJobIdCount(jobs);
+    const base = `jobs-${stamp()}`;
     let text;
     let filename;
     let mime;
@@ -223,6 +305,10 @@ async function exportAll(format) {
         {
           exportedAt: new Date().toISOString(),
           count: jobs.length,
+          uniqueJobIds: uniqueIds,
+          tabCount,
+          failed,
+          failures: failures.length ? failures : undefined,
           jobs,
         },
         null,
@@ -240,10 +326,15 @@ async function exportAll(format) {
       mime = "text/plain";
     }
 
-    downloadText(filename, text, mime);
+    await downloadText(filename, text, mime);
 
     const failNote = failed ? `, ${failed} failed` : "";
-    setBulkStatus(`Exported ${jobs.length}/${tabCount} job(s)${failNote} → ${filename}`, "is-ok");
+    const dupNote =
+      uniqueIds < jobs.length ? `, ${uniqueIds} unique job ids` : "";
+    setBulkStatus(
+      `Exported ${jobs.length}/${tabCount} job(s)${failNote}${dupNote} → ${filename}`,
+      "is-ok"
+    );
     setStatus(`Bulk export ready (${jobs.length})`, "is-ok");
 
     await browser.storage.local.set({
@@ -252,6 +343,8 @@ async function exportAll(format) {
         savedAt: new Date().toISOString(),
         format,
         filename,
+        count: jobs.length,
+        uniqueJobIds: uniqueIds,
       },
     });
   } catch (err) {
@@ -264,9 +357,9 @@ async function exportAll(format) {
 async function extractFromTab() {
   setStatus("Extracting job…");
   const tab = await getActiveTab();
-  if (!tab?.id || !tab.url || !isJobsDbUrl(tab.url)) {
+  if (!tab?.id || !tab.url || !isSupportedSiteUrl(tab.url)) {
     setJob(null);
-    setStatus("Open a JobsDB job page (hk/th.jobsdb.com)", "is-error");
+    setStatus("Open a JobsDB or LinkedIn job page", "is-error");
     return;
   }
 
@@ -282,7 +375,7 @@ async function extractFromTab() {
     setJob(null);
     setStatus(result?.errors?.[0] || "No job data found", "is-error");
   } catch {
-    setStatus("Cannot reach the page — refresh the JobsDB tab and try again", "is-error");
+    setStatus("Cannot reach the page — refresh the job tab and try again", "is-error");
     const stored = await browser.storage.local.get("lastExtractedJob");
     if (stored.lastExtractedJob?.job) {
       setJob(stored.lastExtractedJob.job, "Showing last saved job");

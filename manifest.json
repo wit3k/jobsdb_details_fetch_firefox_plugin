@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "JobsDB Extractor",
-  "version": "1.1.1",
-  "description": "Extract job offer details from JobsDB (HK/TH).",
+  "name": "Job Extractor",
+  "version": "1.2.3",
+  "description": "Extract job offer details from JobsDB (HK/TH) and LinkedIn.",
   "browser_specific_settings": {
     "gecko": {
       "id": "jobsdb-extractor@local",
@@ -12,17 +12,19 @@
       }
     }
   },
-  "permissions": ["activeTab", "tabs", "clipboardWrite", "storage"],
+  "permissions": ["activeTab", "tabs", "clipboardWrite", "storage", "downloads"],
   "host_permissions": [
     "*://hk.jobsdb.com/*",
     "*://th.jobsdb.com/*",
-    "*://*.jobsdb.com/*"
+    "*://*.jobsdb.com/*",
+    "*://*.linkedin.com/*",
+    "*://linkedin.com/*"
   ],
   "background": {
     "scripts": ["background/background.js"]
   },
   "action": {
-    "default_title": "JobsDB Extractor",
+    "default_title": "Job Extractor",
     "default_popup": "popup/popup.html",
     "default_icon": {
       "48": "icons/icon-48.png",
@@ -42,6 +44,19 @@
         "*://*.jobsdb.com/*"
       ],
       "js": ["content/extract.js", "content/content.js"],
+      "css": ["content/content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://*.linkedin.com/jobs/*",
+        "*://linkedin.com/jobs/*"
+      ],
+      "js": [
+        "content/extract.js",
+        "content/extract-linkedin.js",
+        "content/content.js"
+      ],
       "css": ["content/content.css"],
       "run_at": "document_idle"
     }

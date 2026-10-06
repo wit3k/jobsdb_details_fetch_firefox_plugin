@@ -1,16 +1,19 @@
-# JobsDB Extractor
+# Job Extractor
 
-A Firefox extension that pulls structured job details from [JobsDB](https://www.jobsdb.com) listing pages (Hong Kong & Thailand) and lets you copy or export them as JSON, Markdown, or plain text.
+A Firefox extension that pulls structured job details from [JobsDB](https://www.jobsdb.com) (Hong Kong & Thailand) and [LinkedIn](https://www.linkedin.com/jobs/) job pages, and lets you copy or export them as JSON, Markdown, or plain text.
 
-![JobsDB Extractor popup](screenshot01.png)
+![Job Extractor popup](screenshot01.png)
 
 ## Features
 
 - **One-click extract** from the current job page (popup or on-page button)
 - **Multiple output formats**: JSON, Markdown, plain text
-- **Bulk export** of every open JobsDB job tab into a single downloadable file
-- **Robust parsing** — merges data from JSON-LD, Next.js page data, and DOM selectors so it still works when the site layout shifts
-- Works on `hk.jobsdb.com` and `th.jobsdb.com` job detail pages
+- **Bulk export** of every open JobsDB / LinkedIn job tab into a single downloadable file
+- **Robust parsing** — merges data from JSON-LD, embedded page data, and DOM selectors so it still works when the site layout shifts
+- Works on:
+  - `hk.jobsdb.com` / `th.jobsdb.com` job detail pages
+  - LinkedIn job pages on any regional host (`www`, `hk`, …) with `/jobs/view/…` in the URL  
+    (search/collection tabs like `/jobs/search` are ignored)
 
 ### Fields extracted
 
@@ -28,7 +31,7 @@ A Firefox extension that pulls structured job details from [JobsDB](https://www.
 1. Open Firefox and go to `about:debugging#/runtime/this-firefox`
 2. Click **Load Temporary Add-on…**
 3. Select the `manifest.json` file from this folder
-4. Open a job detail page on JobsDB and use the extension
+4. Open a job detail page on JobsDB or LinkedIn and use the extension
 
 > Temporary add-ons are removed when Firefox restarts. Reload the add-on from the same page after each restart, or after you change the code.
 
@@ -70,8 +73,9 @@ After Mozilla signs it, you can install the returned file in Firefox like any ot
 
 ### Single job
 
-1. Open a job detail page — the URL should look like  
-   `https://hk.jobsdb.com/.../job/12345678` (or the Thailand equivalent).
+1. Open a job detail page — for example:
+   - JobsDB: `https://hk.jobsdb.com/.../job/12345678`
+   - LinkedIn: `https://www.linkedin.com/jobs/view/1234567890`
 2. Either:
    - Click the floating **Extract** button on the page (copies JSON to the clipboard), or
    - Open the extension popup from the toolbar.
@@ -83,19 +87,19 @@ After Mozilla signs it, you can install the returned file in Firefox like any ot
 
 ### Bulk export
 
-1. Open one or more JobsDB job tabs in the same Firefox window/session.
+1. Open one or more JobsDB / LinkedIn job tabs in the same Firefox window/session.
 2. Open the extension popup.
-3. Under **All open JobsDB job tabs**, choose:
+3. Under **All open job tabs**, choose:
    - **Export JSON** — `{ exportedAt, count, jobs: [...] }`
    - **Export MD** — jobs separated by `---`
    - **Export TXT** — jobs separated by a text divider  
 
-The file downloads automatically (e.g. `jobsdb-jobs-20260929-120000.json`).
+The file downloads automatically (e.g. `jobs-20260929-120000.json`). JSON exports include `count`, `uniqueJobIds`, and `tabCount` so you can spot truncated downloads or duplicate job ids.
 
 ## Requirements
 
 - Firefox **109+** (Manifest V3 / `browser_specific_settings.gecko`)
-- Permissions used: `activeTab`, `tabs`, `clipboardWrite`, `storage`, plus host access to `*.jobsdb.com`
+- Permissions used: `activeTab`, `tabs`, `clipboardWrite`, `storage`, plus host access to `*.jobsdb.com` and `linkedin.com`
 
 ## Project layout
 
@@ -106,7 +110,8 @@ The file downloads automatically (e.g. `jobsdb-jobs-20260929-120000.json`).
 ├── background/
 │   └── background.js      # Saves last extracted job
 ├── content/
-│   ├── extract.js         # Parsing + Markdown/text formatters
+│   ├── extract.js         # Shared helpers + JobsDB parsing + formatters
+│   ├── extract-linkedin.js # LinkedIn parsing
 │   ├── content.js         # Floating Extract button + messaging
 │   └── content.css
 ├── popup/
@@ -120,10 +125,11 @@ The file downloads automatically (e.g. `jobsdb-jobs-20260929-120000.json`).
 
 | Problem | What to try |
 | --- | --- |
-| “Open a JobsDB job page…” | You’re not on a `/job/…` detail URL — open a specific listing. |
-| “Content script unavailable” / “refresh the tab” | Reload the JobsDB tab, then open the popup again. |
+| “Open a JobsDB or LinkedIn job page…” | You’re not on a supported job URL — open a JobsDB `/job/…` page or LinkedIn `/jobs/view/…`. |
+| “Content script unavailable” / “refresh the tab” | Reload the job tab, then open the popup again. |
 | Bulk export finds tabs but all fail | Refresh those job tabs so the content script can inject. |
-| Empty or partial fields | Wait for the page to finish loading, then hit **↻**. Site changes can reduce coverage; the extractor falls back across several data sources. |
+| Empty or partial LinkedIn fields | Sign in if needed, wait for the panel to finish loading, then hit **↻**. You do **not** need to click “See more” — the extractor reads the full description from the page/API. After updating the add-on, reload it in `about:debugging` and refresh the LinkedIn tab (regional hosts like `hk.linkedin.com` are supported). |
+| Empty or partial JobsDB fields | Wait for the page to finish loading, then hit **↻**. Site changes can reduce coverage; the extractor falls back across several data sources. |
 
 ## Privacy
 

@@ -4,18 +4,26 @@
   const BTN_ID = "jobsdb-extractor-fab";
   const TOAST_ID = "jobsdb-extractor-toast";
 
+  function api() {
+    return globalThis.JobExtractor || globalThis.JobsDBExtractor;
+  }
+
+  async function runExtract(options) {
+    return Promise.resolve(api().extractJobDetails(options || {}));
+  }
+
   function ensureFab() {
     if (document.getElementById(BTN_ID)) return;
-    if (!globalThis.JobsDBExtractor?.isJobDetailPage?.()) return;
+    if (!api()?.isJobDetailPage?.()) return;
 
     const btn = document.createElement("button");
     btn.id = BTN_ID;
     btn.type = "button";
-    btn.title = "Extract JobsDB job";
-    btn.setAttribute("aria-label", "Extract JobsDB job");
+    btn.title = "Extract job details";
+    btn.setAttribute("aria-label", "Extract job details");
     btn.textContent = "Extract";
     btn.addEventListener("click", async () => {
-      const result = globalThis.JobsDBExtractor.extractJobDetails();
+      const result = await runExtract({ pageUrl: location.href });
       if (!result.ok) {
         showToast(result.errors[0] || "No data", true);
         return;
@@ -49,11 +57,12 @@
 
   browser.runtime.onMessage.addListener((message) => {
     if (message?.type === "EXTRACT_JOB") {
-      const result = globalThis.JobsDBExtractor.extractJobDetails();
-      if (result.ok) {
-        browser.runtime.sendMessage({ type: "JOB_EXTRACTED", payload: result }).catch(() => {});
-      }
-      return Promise.resolve(result);
+      return runExtract({ pageUrl: message.pageUrl || location.href }).then((result) => {
+        if (result.ok) {
+          browser.runtime.sendMessage({ type: "JOB_EXTRACTED", payload: result }).catch(() => {});
+        }
+        return result;
+      });
     }
     return undefined;
   });

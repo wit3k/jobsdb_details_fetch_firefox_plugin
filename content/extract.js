@@ -1,7 +1,9 @@
 /**
- * JobsDB job detail extraction.
- * Strategy (in order): JSON-LD JobPosting → __NEXT_DATA__ / page props →
+ * Shared job helpers + JobsDB extraction.
+ * Strategy (JobsDB, in order): JSON-LD JobPosting → __NEXT_DATA__ / page props →
  * data-automation DOM → heuristic DOM fallbacks.
+ *
+ * Site routing lives on global.JobExtractor (JobsDB here, LinkedIn in extract-linkedin.js).
  */
 (function (global) {
   "use strict";
@@ -527,6 +529,27 @@
     };
   }
 
+  function isJobsDbHost(hostname) {
+    const host = String(hostname || "").toLowerCase();
+    return host === "jobsdb.com" || host.endsWith(".jobsdb.com");
+  }
+
+  function isLinkedInHost(hostname) {
+    const host = String(hostname || "").toLowerCase();
+    return host === "linkedin.com" || host.endsWith(".linkedin.com");
+  }
+
+  function detectSite(url) {
+    try {
+      const host = new URL(url || global.location.href).hostname;
+      if (isLinkedInHost(host)) return "linkedin";
+      if (isJobsDbHost(host)) return "jobsdb";
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }
+
   function toMarkdown(job) {
     if (!job) return "";
     const lines = [
@@ -578,10 +601,58 @@
     return (header + bullets + desc).trim() + "\n";
   }
 
-  global.JobsDBExtractor = {
+  const JobsDbSite = {
     extractJobDetails,
     isJobDetailPage,
+  };
+
+  const JobExtractor = {
+    detectSite,
+    isJobsDbHost,
+    isLinkedInHost,
     toMarkdown,
     toPlainText,
+    extractJsonLd,
+    mergeJob,
+    textOf,
+    htmlOf,
+    htmlToText,
+    firstMatch,
+    clean,
+    pick,
+    asArray,
+    isJobDetailPage() {
+      const site = detectSite();
+      if (site === "linkedin") {
+        return Boolean(global.LinkedInExtractor?.isJobDetailPage?.());
+      }
+      if (site === "jobsdb") return JobsDbSite.isJobDetailPage();
+      return false;
+    },
+    extractJobDetails(options) {
+      const site = detectSite(options?.pageUrl);
+      if (site === "linkedin") {
+        if (!global.LinkedInExtractor?.extractJobDetails) {
+          return {
+            ok: false,
+            isJobPage: false,
+            job: null,
+            errors: ["LinkedIn extractor is not loaded."],
+          };
+        }
+        return global.LinkedInExtractor.extractJobDetails(options);
+      }
+      if (site === "jobsdb") return JobsDbSite.extractJobDetails(options);
+      return {
+        ok: false,
+        isJobPage: false,
+        job: null,
+        errors: ["Open a JobsDB or LinkedIn job detail page."],
+      };
+    },
   };
+
+  global.JobExtractor = JobExtractor;
+  // Back-compat for popup / older references.
+  global.JobsDBExtractor = JobExtractor;
 })(typeof globalThis !== "undefined" ? globalThis : window);
